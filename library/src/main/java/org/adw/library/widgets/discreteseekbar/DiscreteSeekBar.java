@@ -21,6 +21,7 @@ import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
@@ -62,12 +63,15 @@ public class DiscreteSeekBar extends View {
          * @param fromUser if the change was made from the user or not (i.e. the developer calling {@link #setProgress(int)}
          */
         public void onProgressChanged(DiscreteSeekBar seekBar, int value, boolean fromUser);
+
+        public void onStartTrackingTouch(DiscreteSeekBar seekBar);
+        public void onStopTrackingTouch(DiscreteSeekBar seekBar);
     }
 
     /**
      * Interface to transform the current internal value of this DiscreteSeekBar to anther one for the visualization.
      * <p/>
-     * This will be used on the floating bubble to diaplay a different value if needed.
+     * This will be used on the floating bubble to display a different value if needed.
      * <p/>
      * Using this in conjunction with {@link #setIndicatorFormatter(String)} you will be able to manipulate the
      * value seen by the user
@@ -75,17 +79,39 @@ public class DiscreteSeekBar extends View {
      * @see #setIndicatorFormatter(String)
      * @see #setNumericTransformer(DiscreteSeekBar.NumericTransformer)
      */
-    public interface NumericTransformer {
+    public static abstract class NumericTransformer {
         /**
          * Return the desired value to be shown to the user.
+         * This value will be formatted using the format specified by {@link #setIndicatorFormatter} before displaying it
          *
-         * @param value
-         * @return
+         * @param value The value to be transformed
+         * @return The transformed int
          */
-        public int transform(int value);
+        public abstract int transform(int value);
+
+        /**
+         * Return the desired value to be shown to the user.
+         * This value will be displayed 'as is' without further formatting.
+         *
+         * @param value The value to be transformed
+         * @return A formatted string
+         */
+        public String transformToString(int value) {
+            return String.valueOf(value);
+        }
+
+        /**
+         * Used to indicate which transform will be used. If this method returns true,
+         * {@link #transformToString(int)} will be used, otherwise {@link #transform(int)}
+         * will be used
+         */
+        public boolean useStringTransform() {
+            return false;
+        }
     }
 
-    private static class DefaultNumericTransformer implements NumericTransformer {
+
+    private static class DefaultNumericTransformer extends NumericTransformer {
 
         @Override
         public int transform(int value) {
@@ -121,9 +147,10 @@ public class DiscreteSeekBar extends View {
     Formatter mFormatter;
     private String mIndicatorFormatter;
     private NumericTransformer mNumericTransformer;
+    private StringBuilder mFormatBuilder;
     private OnProgressChangeListener mPublicChangeListener;
     private boolean mIsDragging;
-    private int mDraggOffset;
+    private int mDragOffset;
 
     private Rect mInvalidateRect = new Rect();
     private Rect mTempRect = new Rect();
@@ -208,10 +235,10 @@ public class DiscreteSeekBar extends View {
         if (editMode && rippleColor == null) {
             rippleColor = new ColorStateList(new int[][]{new int[]{}}, new int[]{Color.DKGRAY});
         }
-        if(editMode && trackColor == null) {
+        if (editMode && trackColor == null) {
             trackColor = new ColorStateList(new int[][]{new int[]{}}, new int[]{Color.GRAY});
         }
-        if(editMode && progressColor == null) {
+        if (editMode && progressColor == null) {
             progressColor = new ColorStateList(new int[][]{new int[]{}}, new int[]{0xff009688});
         }
         mRipple = SeekBarCompat.getRipple(rippleColor);
@@ -238,7 +265,6 @@ public class DiscreteSeekBar extends View {
 
         if (!editMode) {
             mIndicator = new PopupIndicator(context, attrs, defStyle, convertValueToMessage(mMax));
-            mIndicator.setValue(convertValueToMessage(mValue));
             mIndicator.setListener(mFloaterListener);
         }
         a.recycle();
@@ -267,9 +293,13 @@ public class DiscreteSeekBar extends View {
      */
     public void setNumericTransformer(@Nullable NumericTransformer transformer) {
         mNumericTransformer = transformer != null ? transformer : new DefaultNumericTransformer();
-        //We need to refresh the PopupIndivator view
+        //We need to refresh the PopupIndicator view
         if (!isInEditMode()) {
-            mIndicator.updateSizes(convertValueToMessage(mNumericTransformer.transform(mMax)));
+            if (mNumericTransformer.useStringTransform()) {
+                mIndicator.updateSizes(mNumericTransformer.transformToString(mMax));
+            } else {
+                mIndicator.updateSizes(convertValueToMessage(mNumericTransformer.transform(mMax)));
+            }
         }
         updateProgressMessage(mValue);
     }
@@ -360,8 +390,8 @@ public class DiscreteSeekBar extends View {
         }
 
         if (mValue != value) {
-            notifyProgress(value, fromUser);
             mValue = value;
+            notifyProgress(value, fromUser);
             updateProgressMessage(value);
             updateThumbPosFromCurrentProgress();
         }
@@ -385,6 +415,26 @@ public class DiscreteSeekBar extends View {
      */
     public void setOnProgressChangeListener(OnProgressChangeListener listener) {
         mPublicChangeListener = listener;
+    }
+
+    /**
+     * Sets the color of the seek thumb, as well as the color of the popup indicator.
+     *
+     * @param startColor The color the seek thumb will be changed to
+     * @param endColor   The color the popup indicator will be changed to
+     */
+    public void setThumbColor(int startColor, int endColor) {
+        mThumb.setColorStateList(ColorStateList.valueOf(startColor));
+        mIndicator.setColors(startColor, endColor);
+    }
+
+    /**
+     * Sets the color of the seekbar scrubber
+     *
+     * @param color The color the track will be changed to
+     */
+    public void setScrubberColor(int color) {
+        mScrubber.setColorFilter(color, PorterDuff.Mode.SRC_ATOP);
     }
 
     private void notifyProgress(int value, boolean fromUser) {
@@ -533,15 +583,34 @@ public class DiscreteSeekBar extends View {
 
     private void updateProgressMessage(int value) {
         if (!isInEditMode()) {
-            mIndicator.setValue(convertValueToMessage(mNumericTransformer.transform(value)));
+            if (mNumericTransformer.useStringTransform()) {
+                mIndicator.setValue(mNumericTransformer.transformToString(value));
+            } else {
+                mIndicator.setValue(convertValueToMessage(mNumericTransformer.transform(value)));
+            }
         }
     }
 
     private String convertValueToMessage(int value) {
         String format = mIndicatorFormatter != null ? mIndicatorFormatter : DEFAULT_FORMATTER;
-        if (mFormatter == null || mFormatter.locale().equals(Locale.getDefault())) {
+        //We're trying to re-use the Formatter here to avoid too much memory allocations
+        //But I'm not completey sure if it's doing anything good... :(
+        //Previously, this condition was wrong so the Formatter was always re-created
+        //But as I fixed the condition, the formatter started outputting trash characters from previous
+        //calls, so I mark the StringBuilder as empty before calling format again.
+
+        //Anyways, I see the memory usage still go up on every call to this method
+        //and I have no clue on how to fix that... damn Strings...
+        if (mFormatter == null || !mFormatter.locale().equals(Locale.getDefault())) {
             int bufferSize = format.length() + String.valueOf(mMax).length();
-            mFormatter = new Formatter(new StringBuilder(bufferSize), Locale.getDefault());
+            if (mFormatBuilder == null) {
+                mFormatBuilder = new StringBuilder(bufferSize);
+            } else {
+                mFormatBuilder.ensureCapacity(bufferSize);
+            }
+            mFormatter = new Formatter(mFormatBuilder, Locale.getDefault());
+        } else {
+            mFormatBuilder.setLength(0);
         }
         return mFormatter.format(format, value).toString();
     }
@@ -589,7 +658,7 @@ public class DiscreteSeekBar extends View {
             //If the user clicked outside the thumb, we compute the current position
             //and force an immediate drag to it.
             mIsDragging = true;
-            mDraggOffset = (bounds.width() / 2) - mAddedTouchBounds;
+            mDragOffset = (bounds.width() / 2) - mAddedTouchBounds;
             updateDragging(ev);
             //As the thumb may have moved, get the bounds again
             mThumb.copyBounds(bounds);
@@ -599,7 +668,10 @@ public class DiscreteSeekBar extends View {
             setPressed(true);
             attemptClaimDrag();
             setHotspot(ev.getX(), ev.getY());
-            mDraggOffset = (int) (ev.getX() - bounds.left - mAddedTouchBounds);
+            mDragOffset = (int) (ev.getX() - bounds.left - mAddedTouchBounds);
+            if (mPublicChangeListener != null) {
+                mPublicChangeListener.onStartTrackingTouch(this);
+            }
         }
         return mIsDragging;
     }
@@ -609,6 +681,9 @@ public class DiscreteSeekBar extends View {
     }
 
     private void stopDragging() {
+        if (mPublicChangeListener != null) {
+            mPublicChangeListener.onStopTrackingTouch(this);
+        }
         mIsDragging = false;
         setPressed(false);
     }
@@ -692,7 +767,7 @@ public class DiscreteSeekBar extends View {
         Rect oldBounds = mThumb.getBounds();
         int halfThumb = oldBounds.width() / 2;
         int addedThumb = mAddedTouchBounds;
-        int newX = x - mDraggOffset + halfThumb;
+        int newX = x - mDragOffset + halfThumb;
         int left = getPaddingLeft() + halfThumb + addedThumb;
         int right = getWidth() - (getPaddingRight() + halfThumb + addedThumb);
         if (newX < left) {
@@ -766,7 +841,7 @@ public class DiscreteSeekBar extends View {
         }
         final Rect finalBounds = mTempRect;
         mThumb.copyBounds(finalBounds);
-        if(!isInEditMode()) {
+        if (!isInEditMode()) {
             mIndicator.move(finalBounds.centerX());
         }
 
@@ -802,7 +877,7 @@ public class DiscreteSeekBar extends View {
     };
 
     private void showFloater() {
-        if(!isInEditMode()) {
+        if (!isInEditMode()) {
             mThumb.animateToPressed();
             mIndicator.showIndicator(this, mThumb.getBounds());
             notifyBubble(true);
@@ -811,7 +886,7 @@ public class DiscreteSeekBar extends View {
 
     private void hideFloater() {
         removeCallbacks(mShowIndicatorRunnable);
-        if(!isInEditMode()) {
+        if (!isInEditMode()) {
             mIndicator.dismiss();
             notifyBubble(false);
         }
@@ -834,7 +909,7 @@ public class DiscreteSeekBar extends View {
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
         removeCallbacks(mShowIndicatorRunnable);
-        if(!isInEditMode()) {
+        if (!isInEditMode()) {
             mIndicator.dismissComplete();
         }
     }
@@ -906,4 +981,3 @@ public class DiscreteSeekBar extends View {
                 };
     }
 }
-

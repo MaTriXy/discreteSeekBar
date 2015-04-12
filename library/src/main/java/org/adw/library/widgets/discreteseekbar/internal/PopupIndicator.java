@@ -31,6 +31,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.FrameLayout;
 
+import org.adw.library.widgets.discreteseekbar.internal.compat.SeekBarCompat;
 import org.adw.library.widgets.discreteseekbar.internal.drawable.MarkerDrawable;
 
 /**
@@ -121,6 +122,9 @@ public class PopupIndicator {
         translateViewIntoPosition(x);
     }
 
+    public void setColors(int startColor, int endColor) {
+        mPopupView.setColors(startColor, endColor);
+    }
 
     /**
      * This will start the closing animation of the Marker and call onClosingComplete when finished
@@ -201,7 +205,7 @@ public class PopupIndicator {
 
     /**
      * Small FrameLayout class to hold and move the bubble around when requested
-     * I wanted to use the {@link org.adw.library.widgets.discreteseekbar.internal.Marker} directly
+     * I wanted to use the {@link Marker} directly
      * but doing so would make some things harder to implement
      * (like moving the marker around, having the Marker's outline to work, etc)
      */
@@ -235,9 +239,9 @@ public class PopupIndicator {
             int centerDiffX = mMarker.getMeasuredWidth() / 2;
             int offset = (x - centerDiffX);
             mMarker.offsetLeftAndRight(offset - mMarker.getLeft());
-            //On API<11, offsetting a view seems to NOT invalidate the proper area.
+            //Without hardware acceleration (or API levels<11), offsetting a view seems to NOT invalidate the proper area.
             //We should calc the proper invalidate Rect but this will be for now...
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.HONEYCOMB) {
+            if (!SeekBarCompat.isHardwareAccelerated(this)) {
                 invalidate();
             }
         }
@@ -257,6 +261,9 @@ public class PopupIndicator {
             }
         }
 
+        public void setColors(int startColor, int endColor) {
+            mMarker.setColors(startColor, endColor);
+        }
     }
 
 }
