@@ -37,15 +37,26 @@ The material-floating-thing is composed into the WindowManager (like the typical
 It uses **com.android.support:support-v4** as the only dependency.
 
 ##Usage
->I'd like to publish it to **jcenter* so developers can easily add it to gradle, but I'd need some help/instructions on doing it.
+This is published in jCenter so you need to use the appropiate repo:
+
+```groovy
+repositories {
+    jcenter()
+}
+
+dependencies {
+    compile 'org.adw.library:discrete-seekbar:1.0.0'
+}
+```
 
 Once imported into your project, you just need to put them into your layous like:
+
 ```xml
 <org.adw.library.widgets.discreteseekbar.DiscreteSeekBar
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:min="2"
-        app:max="15"
+        app:dsb_min="2"
+        app:dsb_max="15"
 />
 ```
 

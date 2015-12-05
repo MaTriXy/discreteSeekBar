@@ -39,7 +39,7 @@ import org.adw.library.widgets.discreteseekbar.internal.drawable.ThumbDrawable;
 /**
  * {@link android.view.ViewGroup} to be used as the real indicator.
  * <p>
- * I've used this to be able to acomodate the TextView
+ * I've used this to be able to accommodate the TextView
  * and the {@link org.adw.library.widgets.discreteseekbar.internal.drawable.MarkerDrawable}
  * with the required positions and offsets
  * </p>
@@ -75,11 +75,11 @@ public class Marker extends ViewGroup implements MarkerDrawable.MarkerAnimationL
         super(context, attrs, defStyleAttr);
         DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
         TypedArray a = context.obtainStyledAttributes(attrs, R.styleable.DiscreteSeekBar,
-                R.attr.discreteSeekBarStyle, R.style.DefaultSeekBar);
+                R.attr.discreteSeekBarStyle, R.style.Widget_DiscreteSeekBar);
 
         int padding = (int) (PADDING_DP * displayMetrics.density) * 2;
         int textAppearanceId = a.getResourceId(R.styleable.DiscreteSeekBar_dsb_indicatorTextAppearance,
-                R.style.DefaultIndicatorTextAppearance);
+                R.style.Widget_DiscreteIndicatorTextAppearance);
         mNumber = new TextView(context);
         //Add some padding to this textView so the bubble has some space to breath
         mNumber.setPadding(padding, 0, padding, 0);
